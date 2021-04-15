@@ -131,9 +131,13 @@ class BalloonDataset(utils.Dataset):
             # The if condition is needed to support VIA versions 1.x and 2.x.
             if type(a['regions']) is dict:
                 polygons = [r['shape_attributes'] for r in a['regions'].values()]
+                name = [r['region_attributes']['label'] for r in a['regions'].values()]
             else:
-                polygons = [r['shape_attributes'] for r in a['regions']] 
+                polygons = [r['shape_attributes'] for r in a['regions']]
+                name = [r['region_attributes']['label'] for r in a['regions']]
 
+            name_dict = {"sharp": 1, "google": 2, "hp": 3, "nokia": 4, "razer": 5, "ktec": 6}
+            name_id = [name_dict[a] for a in name]
             # load_mask() needs the image size to convert polygons to masks.
             # Unfortunately, VIA doesn't include it in JSON, so we must read
             # the image. This is only managable since the dataset is tiny.
@@ -145,6 +149,7 @@ class BalloonDataset(utils.Dataset):
                 "charger",
                 image_id=a['filename'],  # use file name as a unique image id
                 path=image_path,
+                class_id=name_id,
                 width=width, height=height,
                 polygons=polygons)
 
@@ -160,11 +165,15 @@ class BalloonDataset(utils.Dataset):
         if image_info["source"] != "charger":
             return super(self.__class__, self).load_mask(image_id)
 
+        name_id = image_info["class_id"]
+        print(name_id)
+
         # Convert polygons to a bitmap mask of shape
         # [height, width, instance_count]
         info = self.image_info[image_id]
         mask = np.zeros([info["height"], info["width"], len(info["polygons"])],
                         dtype=np.uint8)
+        class_ids = np.array(name_id, dtype=np.int32)
         for i, p in enumerate(info["polygons"]):
             # Get indexes of pixels inside the polygon and set them to 1
             # rr, cc = skimage.draw.polygon(p['all_points_y'], p['all_points_x'])
@@ -182,7 +191,8 @@ class BalloonDataset(utils.Dataset):
 
         # Return mask, and array of class IDs of each instance. Since we have
         # one class ID only, we return an array of 1s
-        return mask.astype(np.bool), np.ones([mask.shape[-1]], dtype=np.int32)
+        # return mask.astype(np.bool), np.ones([mask.shape[-1]], dtype=np.int32)
+        return (mask.astype(np.bool), class_ids)
 
     def image_reference(self, image_id):
         """Return the path of the image."""
@@ -212,7 +222,7 @@ def train(model):
     print("Training network heads")
     model.train(dataset_train, dataset_val,
                 learning_rate=config.LEARNING_RATE,
-                epochs=6,
+                epochs=1,
                 layers='heads')
 
 
