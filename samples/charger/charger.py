@@ -168,13 +168,16 @@ class BalloonDataset(utils.Dataset):
         for i, p in enumerate(info["polygons"]):
             # Get indexes of pixels inside the polygon and set them to 1
             # rr, cc = skimage.draw.polygon(p['all_points_y'], p['all_points_x'])
-            Ystart=p['y']
-            Yend=p['y']+p['height']
-            Xstart=p['x']
-            Xend=p['x']+p['width']
-            Y=np.array([Ystart,Ystart,Yend,Yend])
-            X=np.array([Xstart,Xend,Xend,Xstart])
-            rr, cc = skimage.draw.polygon(Y, X)
+            if 'all_points_y' in info["polygons"][0]:
+                rr, cc = skimage.draw.polygon(p['all_points_y'], p['all_points_x'])
+            else:
+                Ystart=p['y']
+                Yend=p['y']+p['height']
+                Xstart=p['x']
+                Xend=p['x']+p['width']
+                Y=np.array([Ystart,Ystart,Yend,Yend])
+                X=np.array([Xstart,Xend,Xend,Xstart])
+                rr, cc = skimage.draw.polygon(Y, X)
             mask[rr, cc, i] = 1
 
         # Return mask, and array of class IDs of each instance. Since we have
@@ -209,7 +212,7 @@ def train(model):
     print("Training network heads")
     model.train(dataset_train, dataset_val,
                 learning_rate=config.LEARNING_RATE,
-                epochs=1,
+                epochs=6,
                 layers='heads')
 
 
