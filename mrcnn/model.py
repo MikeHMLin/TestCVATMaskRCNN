@@ -815,9 +815,12 @@ class DetectionLayer(KE.Layer):
         # Reshape output
         # [batch, num_detections, (y1, x1, y2, x2, class_id, class_score)] in
         # normalized coordinates
+        # return tf.reshape(
+            # detections_batch,
+            # [self.config.BATCH_SIZE, self.config.DETECTION_MAX_INSTANCES, 6])
         return tf.reshape(
             detections_batch,
-            [self.config.BATCH_SIZE, self.config.DETECTION_MAX_INSTANCES, 6])
+            [self.config.IMAGES_PER_GPU, self.config.DETECTION_MAX_INSTANCES, 6])    
 
     def compute_output_shape(self, input_shape):
         return (None, self.config.DETECTION_MAX_INSTANCES, 6)
