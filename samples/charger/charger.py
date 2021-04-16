@@ -30,9 +30,14 @@ Usage: import the module (see Jupyter notebooks for examples), or run from
 import os
 import sys
 import json
+import time
 import datetime
 import numpy as np
 import skimage.draw
+
+from pycocotools.coco import COCO
+from pycocotools.cocoeval import COCOeval
+from pycocotools import mask as maskUtils
 
 # Root directory of the project
 ROOT_DIR = os.path.abspath("../../")
@@ -166,7 +171,7 @@ class BalloonDataset(utils.Dataset):
             return super(self.__class__, self).load_mask(image_id)
 
         name_id = image_info["class_id"]
-        print(name_id)
+        #print(name_id)
 
         # Convert polygons to a bitmap mask of shape
         # [height, width, instance_count]
@@ -222,7 +227,7 @@ def train(model):
     print("Training network heads")
     model.train(dataset_train, dataset_val,
                 learning_rate=config.LEARNING_RATE,
-                epochs=1,
+                epochs=7,
                 layers='heads')
 
 
@@ -297,6 +302,87 @@ def detect_and_color_splash(model, image_path=None, video_path=None):
         vwriter.release()
     print("Saved to ", file_name)
 
+    
+############################################################
+#  COCO Evaluation
+############################################################
+
+def build_coco_results(dataset, image_ids, rois, class_ids, scores, masks):
+    """Arrange resutls to match COCO specs in http://cocodataset.org/#format
+    """
+    # If no results, return an empty list
+    if rois is None:
+        return []
+
+    results = []
+    for image_id in image_ids:
+        # Loop through detections
+        for i in range(rois.shape[0]):
+            class_id = class_ids[i]
+            score = scores[i]
+            bbox = np.around(rois[i], 1)
+            mask = masks[:, :, i]
+
+            result = {
+                "image_id": image_id,
+                "category_id": dataset.get_source_class_id(class_id, "charger"),
+                "bbox": [bbox[1], bbox[0], bbox[3] - bbox[1], bbox[2] - bbox[0]],
+                "score": score,
+                "segmentation": maskUtils.encode(np.asfortranarray(mask))
+            }
+            results.append(result)
+    return results
+
+
+def evaluate_coco(model, dataset, coco, eval_type="bbox", image_ids=None):
+    """Runs official COCO evaluation.
+    dataset: A Dataset object with valiadtion data
+    eval_type: "bbox" or "segm" for bounding box or segmentation evaluation
+    limit: if not 0, it's the number of images to use for evaluation
+    """
+    # Pick COCO images from the dataset
+    image_ids = image_ids or dataset.image_ids
+    # image_ids = coco.annotations
+
+    # Get corresponding COCO image IDs.
+    coco_image_ids = [dataset.image_info[id]["id"] for id in image_ids]
+
+    t_prediction = 0
+    t_start = time.time()
+
+    results = []
+    for i, image_id in enumerate(image_ids):
+        # Load image
+        image = dataset.load_image(image_id)
+
+        # Run detection
+        t = time.time()
+        r = model.detect([image], verbose=0)[0]
+        t_prediction += (time.time() - t)
+
+        # Convert results to COCO format
+        # Cast masks to uint8 because COCO tools errors out on bool
+        image_results = build_coco_results(dataset, coco_image_ids[i:i + 1],
+                                           r["rois"], r["class_ids"],
+                                           r["scores"],
+                                           r["masks"].astype(np.uint8))
+        results.extend(image_results)
+
+    # Load results. This modifies results with additional attributes.
+    # coco_results = coco.loadRes(results)
+
+    # Evaluate
+    # cocoEval = COCOeval(coco, coco_results, eval_type)
+    # cocoEval.params.imgIds = coco_image_ids
+    # cocoEval.evaluate()
+    # cocoEval.accumulate()
+    # cocoEval.summarize()
+
+    # print("Prediction time: {}. Average {}/image".format(
+        # t_prediction, t_prediction / len(image_ids)))
+    # print("Total time: ", time.time() - t_start)
+
+
 
 ############################################################
 #  Training
@@ -321,20 +407,20 @@ if __name__ == '__main__':
                         default=DEFAULT_LOGS_DIR,
                         metavar="/path/to/logs/",
                         help='Logs and checkpoints directory (default=logs/)')
-    parser.add_argument('--image', required=False,
-                        metavar="path or URL to image",
-                        help='Image to apply the color splash effect on')
-    parser.add_argument('--video', required=False,
-                        metavar="path or URL to video",
-                        help='Video to apply the color splash effect on')
+    # parser.add_argument('--image', required=False,
+                        # metavar="path or URL to image",
+                        # help='Image to apply the color splash effect on')
+    # parser.add_argument('--video', required=False,
+                        # metavar="path or URL to video",
+                        # help='Video to apply the color splash effect on')
     args = parser.parse_args()
 
     # Validate arguments
-    if args.command == "train":
-        assert args.dataset, "Argument --dataset is required for training"
-    elif args.command == "splash":
-        assert args.image or args.video,\
-               "Provide --image or --video to apply color splash"
+    # if args.command == "train":
+        # assert args.dataset, "Argument --dataset is required for training"
+    # elif args.command == "splash":
+        # assert args.image or args.video,\
+               # "Provide --image or --video to apply color splash"
 
     print("Weights: ", args.weights)
     print("Dataset: ", args.dataset)
@@ -349,6 +435,7 @@ if __name__ == '__main__':
             # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
             GPU_COUNT = 1
             IMAGES_PER_GPU = 1
+            DETECTION_MIN_CONFIDENCE = 0  # add Mike
         config = InferenceConfig()
     config.display()
 
@@ -390,8 +477,13 @@ if __name__ == '__main__':
     if args.command == "train":
         train(model)
     elif args.command == "splash":
-        detect_and_color_splash(model, image_path=args.image,
-                                video_path=args.video)
+        # detect_and_color_splash(model, image_path=args.image,
+        #                        video_path=args.video)
+        dataset_val = BalloonDataset()
+        val_type = "val"
+        coco = dataset_val.load_balloon(args.dataset, "val")
+        dataset_val.prepare()        
+        evaluate_coco(model, dataset_val, coco, "bbox")
     else:
         print("'{}' is not recognized. "
               "Use 'train' or 'splash'".format(args.command))
