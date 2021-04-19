@@ -485,10 +485,10 @@ if __name__ == '__main__':
     elif args.command == "splash":
         # detect_and_color_splash(model, image_path=args.image,
         #                        video_path=args.video)
-        dataset_val = BalloonDataset()
-        coco = dataset_val.load_balloon(args.dataset, "val")
-        dataset_val.prepare()        
-        evaluate_coco(model, dataset_val, coco, "bbox")
+        # dataset_val = BalloonDataset()
+        # coco = dataset_val.load_balloon(args.dataset, "val")
+        # dataset_val.prepare()        
+        # evaluate_coco(model, dataset_val, coco, "bbox")
     else:
         print("'{}' is not recognized. "
               "Use 'train' or 'splash'".format(args.command))
