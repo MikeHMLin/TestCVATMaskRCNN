@@ -137,11 +137,17 @@ class BalloonDataset(utils.Dataset):
             if type(a['regions']) is dict:
                 polygons = [r['shape_attributes'] for r in a['regions'].values()]
                 name = [r['region_attributes']['label'] for r in a['regions'].values()]
+                name_dict = {"sharp": 1, "google": 2, "hp": 3, "nokia": 4, "razer": 5, "ktec": 6}
             else:
                 polygons = [r['shape_attributes'] for r in a['regions']]
-                name = [r['region_attributes']['label'] for r in a['regions']]
+                if 'label' in a['regions'][0]['region_attributes']:
+                    name = [r['region_attributes']['label'] for r in a['regions']]
+                    name_dict = {"sharp": 1, "google": 2, "hp": 3, "nokia": 4, "razer": 5, "ktec": 6}
+                else:
+                    name = [r['region_attributes'][''] for r in a['regions']]
+                    # name_dict = {"sharp": 1, "google": 2, "hp": 3, "nokia": 4, "razer": 5, "ktec": 6}
+                    name_dict = {"1": 1, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6}                    
 
-            name_dict = {"sharp": 1, "google": 2, "hp": 3, "nokia": 4, "razer": 5, "ktec": 6}
             name_id = [name_dict[a] for a in name]
             # load_mask() needs the image size to convert polygons to masks.
             # Unfortunately, VIA doesn't include it in JSON, so we must read
@@ -227,7 +233,7 @@ def train(model):
     print("Training network heads")
     model.train(dataset_train, dataset_val,
                 learning_rate=config.LEARNING_RATE,
-                epochs=7,
+                epochs=1,
                 layers='heads')
 
 
