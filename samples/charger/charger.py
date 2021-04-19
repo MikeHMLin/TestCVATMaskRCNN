@@ -413,9 +413,9 @@ if __name__ == '__main__':
                         default=DEFAULT_LOGS_DIR,
                         metavar="/path/to/logs/",
                         help='Logs and checkpoints directory (default=logs/)')
-    # parser.add_argument('--image', required=False,
-                        # metavar="path or URL to image",
-                        # help='Image to apply the color splash effect on')
+    parser.add_argument('--image', required=False,
+                        metavar="path or URL to image",
+                        help='Image to apply the color splash effect on')
     # parser.add_argument('--video', required=False,
                         # metavar="path or URL to video",
                         # help='Video to apply the color splash effect on')
@@ -486,7 +486,6 @@ if __name__ == '__main__':
         # detect_and_color_splash(model, image_path=args.image,
         #                        video_path=args.video)
         dataset_val = BalloonDataset()
-        val_type = "val"
         coco = dataset_val.load_balloon(args.dataset, "val")
         dataset_val.prepare()        
         evaluate_coco(model, dataset_val, coco, "bbox")
