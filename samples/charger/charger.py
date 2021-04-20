@@ -35,8 +35,6 @@ import datetime
 import numpy as np
 import skimage.draw
 
-from pycocotools.coco import COCO
-from pycocotools.cocoeval import COCOeval
 from pycocotools import mask as maskUtils
 
 # Root directory of the project
@@ -188,7 +186,7 @@ class BalloonDataset(utils.Dataset):
         for i, p in enumerate(info["polygons"]):
             # Get indexes of pixels inside the polygon and set them to 1
             # rr, cc = skimage.draw.polygon(p['all_points_y'], p['all_points_x'])
-            if 'all_points_y' in info["polygons"][0]:
+            if 'all_points_y' in info["polygons"][i]:
                 rr, cc = skimage.draw.polygon(p['all_points_y'], p['all_points_x'])
             else:
                 Ystart=p['y']
@@ -422,11 +420,11 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Validate arguments
-    # if args.command == "train":
-        # assert args.dataset, "Argument --dataset is required for training"
-    # elif args.command == "splash":
-        # assert args.image or args.video,\
-               # "Provide --image or --video to apply color splash"
+    if args.command == "train":
+        assert args.dataset, "Argument --dataset is required for training"
+    elif args.command == "splash":
+        assert args.image or args.video,\
+               "Provide --image or --video to apply color splash"
 
     print("Weights: ", args.weights)
     print("Dataset: ", args.dataset)
